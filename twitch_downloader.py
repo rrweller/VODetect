@@ -19,9 +19,8 @@ HEADERS = {
 
 print_lock = threading.Lock()
 
-print_lock = threading.Lock()
-
 def download_single_vod(channel_name, vod_id):
+    print(f"Attempting to download VOD ID: {vod_id}")  # Debug line
     # Ensure the 'vods' directory exists
     if not os.path.exists("vods"):
         os.makedirs("vods")
@@ -85,13 +84,12 @@ def get_latest_vod_ids(user_id, num_vods=1, after_cursor=None):
     response = requests.get(url, headers=HEADERS)
     data = response.json()
     return [vod['id'] for vod in data['data']]
-
     
 def get_latest_vods(channel_name, num_vods=10, after_cursor=None):
     user_id = get_user_id(channel_name)
     if not user_id:
         print(f"Failed to get user_id for channel: {channel_name}")
-        return []
+        return [], None  # Return empty list and None for after_cursor
 
     url = f"https://api.twitch.tv/helix/videos?user_id={user_id}&first={num_vods}&type=archive"
     if after_cursor:
@@ -102,14 +100,10 @@ def get_latest_vods(channel_name, num_vods=10, after_cursor=None):
 
     if 'data' not in data:
         print(f"Error fetching VODs. Response: {data}")
-        return []
+        return [], None  # Return empty list and None for after_cursor
 
-    return [(vod['title'], vod['id']) for vod in data['data']]
-
-    
-def get_more_vod_ids(user_id, after_cursor, num_vods=10):
-    return get_latest_vod_ids(user_id, num_vods, after_cursor)
-
+    after_cursor = data['pagination'].get('cursor', None) if 'pagination' in data else None
+    return [(vod['title'], vod['id']) for vod in data['data']], after_cursor
 
 if __name__ == "__main__":
     try:

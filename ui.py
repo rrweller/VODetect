@@ -68,12 +68,13 @@ class TwitchForm(npyscreen.ActionForm):
     def create(self):
         self.channel_name_value = None
         self.vods = self.add(npyscreen.MultiSelect, name="VODs", values=[], scroll_exit=True)
+        self.after_cursor = None
         self.loaded_vod_count = 0
         self.selected_vod_ids = []  # List to store all selected VOD IDs
 
     def beforeEditing(self):
         if self.channel_name_value:
-            self.load_vods()
+            self.loaded_vods, self.after_cursor = self.load_vods()  # Store the loaded VODs in self.loaded_vods
 
     def on_ok(self):
         if not self.vods.values:
@@ -98,7 +99,7 @@ class TwitchForm(npyscreen.ActionForm):
 
     def load_vods(self):
         # Load the next set of vods
-        channel_vods = twitch_downloader.get_latest_vods(self.channel_name_value, num_vods=10)
+        channel_vods, self.after_cursor = twitch_downloader.get_latest_vods(self.channel_name_value, num_vods=10, after_cursor=self.after_cursor)
         vod_titles = [vod[0] for vod in channel_vods] + ["Load 10 More"]
         
         # Clear previous selections
@@ -108,17 +109,18 @@ class TwitchForm(npyscreen.ActionForm):
         self.loaded_vod_count += 10
         self.vods.cursor_line = 0
         self.vods.display()
+        return channel_vods, self.after_cursor  # Return both values
 
     def get_selected_vods(self):
         selected_vods = [self.vods.values[i] for i in self.vods.value if i != len(self.vods.values) - 1]
-        all_vods = twitch_downloader.get_latest_vods(self.channel_name_value, num_vods=self.loaded_vod_count)
-        self.selected_vod_ids.extend([vod_id for title, vod_id in all_vods if title in selected_vods])
+        self.selected_vod_ids.extend([vod_id for title, vod_id in self.loaded_vods if title in selected_vods])
 
     def start_download_and_inference(self):
         # Start the inference worker thread
         threading.Thread(target=processor.inference_worker).start()
 
         def download_and_infer():
+            print(f"VOD IDs to download: {self.selected_vod_ids}")  # Debug line
             for vod_id in self.selected_vod_ids:
                 with print_lock:
                     vod_file = twitch_downloader.download_single_vod(self.channel_name_value, vod_id)
