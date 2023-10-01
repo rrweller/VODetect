@@ -1,6 +1,6 @@
 # VODetect
 
-VODetect is a powerful tool designed to download videos from YouTube and Twitch VODs, and then process them using a pretrained YOLOv8 model to detect objects. This project is an experimental excerise in using ChatGPT to code a complex program, and as such it has been nearly 100% written by ChatGPT. Due to this, do not expect the code to be pretty or entirely bug-free. If you encounter a bug feel free to open an issue, but I cannot guarantee it will be resolved. For those who wish to tackle the challenge of repairing/improving the code themselves, feel free to fork this.
+VODetect is a powerful tool designed to download videos from YouTube and Twitch VODs, and then process them using a pretrained YOLOv8 model to detect objects. This project is an experimental exercise in using ChatGPT to code a complex program, and as such it has been nearly 100% written by ChatGPT. Due to this, do not expect the code to be pretty or entirely bug-free. If you encounter a bug feel free to open an issue, but I cannot guarantee it will be resolved. For those who wish to tackle the challenge of repairing/improving the code themselves, feel free to fork this.
 
 ## Features
 
