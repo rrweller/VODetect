@@ -37,3 +37,39 @@ VODetect is a powerful tool designed to download videos from YouTube and Twitch 
 9. Paste your OAUTH key into the config file, specify the name of your YOLO model file, and modify any other values you desire. Refer to the description of these settings below
 
 10. Run ``run.bat`` or ``run.sh``
+
+
+## Configuration Settings
+
+### Processor
+- **MAX_INFERENCE_THREADS**: The maximum number of threads that can run inference simultaneously. This determines how many videos can be processed at the same time.
+  - What you choose to set this at will vary with your GPU and how large your model is. Some amount of threading is ideal as in most cases inference does not fully use the GPU with a single thread, however you will hit diminishing returns quickly. I recommend setting this between 2-4
+
+### Folder Processing
+- **VIDEO_RESOLUTION**: The target resolution `[width, height]` to which all videos in a directory will be resized to when the script is in folder processing mode.
+
+### Twitch Downloader
+- **CLIENT_ID**: Your Twitch application's client ID. This is required to make API requests to Twitch.
+- **OAUTH_TOKEN**: Your Twitch OAuth token. This is required for authentication when making certain API requests to Twitch. Use the `request_oauth.py` script to obtain one.
+- **DESIRED_QUALITY**: The desired quality/resolution of the Twitch VODs you want to download (e.g., "720p").
+  - Valid values are ``1080p``,``720p``,``480p``,and ``360p``,
+
+### YouTube Downloader
+- **DESIRED_QUALITY**: The desired quality/resolution of the YouTube videos you want to download (e.g., "720p").
+  - Valid values are ``1080p``,``720p``,``480p``,and ``360p``,
+
+### Inference
+- **model_path**: The path to the pretrained YOLO model that will be used for object detection.
+- **output_dir**: The directory where the inference results will be saved.
+- **debug**: If set to `true`, the program will run in debug mode. Costs performance!
+  - Debug mode draws the bounding boxes over the output videos, and also outputs an entire full length video in the debug folder.
+- **log_output_only**: If set to `true`, only the object detections that were output will be logged. Set to `false` to output all object dections by the model to the log.
+- **frame_check_interval**: The interval (in frames) at which the model will check the video for objects.
+- **grace_period_val**: The number of frames to wait before declaring that an object is no longer in the video. Useful to prevent false negatives from prematurely ending the object dection window.
+  - The ideal value varies based on the `frame_check_interval`. I recommend a value of `4-6` for an interval of `2`
+- **min_detect_percent**: The minimum percentage of frames in which an object must be detected in its window to be considered present in the video. Helps eliminate false positives.
+- **default_confidence_threshold**: The default confidence threshold for object detection. Objects detected with a confidence below this threshold will be ignored. Valid values are from `0-1`
+- **user_defined_confidence_thresholds**: Specific confidence thresholds for certain objects. If you want to have a higher threshold for a specific object, you can set it here. Valid values are from `0-1`
+- **enable_preprocessing**: If set to `true`, the video will undergo a histogram transformation as a pre-processing step. Useful if your video is abnormally dark. Off by default
+- **histogram_equalization_weight**: The weight for histogram equalization during preprocessing. This enhances the contrast of the video, which can improve object detection in certain scenarios. Valid values are from `0-1`.
+
