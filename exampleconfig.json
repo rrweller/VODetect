@@ -14,7 +14,7 @@
         "DESIRED_QUALITY": "720p"
     },
     "inference": {
-        "model_path": "ENTER MODEL PATH HERE",
+        "model_path": "model//ENTER MODEL NAME HERE",
         "output_dir": "output",
         "debug": false,
         "log_output_only": true,
