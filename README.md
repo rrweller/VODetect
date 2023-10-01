@@ -73,3 +73,5 @@ VODetect is a powerful tool designed to download videos from YouTube and Twitch 
 - **enable_preprocessing**: If set to `true`, the video will undergo a histogram transformation as a pre-processing step. Useful if your video is abnormally dark. Off by default
 - **histogram_equalization_weight**: The weight for histogram equalization during preprocessing. This enhances the contrast of the video, which can improve object detection in certain scenarios. Valid values are from `0-1`.
 
+## Model training
+If you wish to train your own YOLO model, I recommend using https://roboflow.com/. You can use their service for free to tag objects in your training images and export the dataset. They also provide free to use Google Colab notebooks to train your model using the exported dataset.
