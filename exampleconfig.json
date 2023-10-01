@@ -1,0 +1,32 @@
+{
+    "processor": {
+        "MAX_INFERENCE_THREADS": 4
+    },
+    "folder_processing": {
+        "VIDEO_RESOLUTION": [1920, 1080]
+    },
+    "twitch_downloader": {
+        "CLIENT_ID": "ENTER CLIENT_ID HERE",
+        "OAUTH_TOKEN": "ENTER OAUTH_TOKEN HERE (use request_oauth.py to get one)",
+        "DESIRED_QUALITY": "720p"
+    },
+    "youtube_downloader": {
+        "DESIRED_QUALITY": "720p"
+    },
+    "inference": {
+        "model_path": "ENTER MODEL PATH HERE",
+        "output_dir": "output",
+        "debug": false,
+        "log_output_only": true,
+        "frame_check_interval": 2,
+        "grace_period_val": 6,
+        "min_detect_percent": 0.40,
+        "default_confidence_threshold": 0.4,
+        "user_defined_confidence_thresholds": {
+            "example object 1": 0.7,
+            "example object 2": 0.5
+        },
+        "enable_preprocessing": false,
+        "histogram_equalization_weight": 0.2
+    }
+}
