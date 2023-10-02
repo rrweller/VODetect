@@ -63,11 +63,11 @@ VODetect is a powerful tool designed to download videos from YouTube and Twitch 
 - **output_dir**: The directory where the inference results will be saved.
 - **debug**: If set to `true`, the program will run in debug mode. Costs performance!
   - Debug mode draws the bounding boxes over the output videos, and also outputs an entire full length video in the debug folder.
-- **log_output_only**: If set to `true`, only the object detections that were output will be logged. Set to `false` to output all object dections by the model to the log.
-- **frame_check_interval**: The interval (in frames) at which the model will check the video for objects.
+- **log_output_only**: If set to `true`, only the object detections that were output will be logged. Set to `false` to write all object detections by the model to the log.
+- **frame_check_interval**: Runs the model on every `n-th` frame. Useful for increasing performance with some accuracy loss. Valid values are positive integers.
 - **grace_period_val**: The number of frames to wait before declaring that an object is no longer in the video. Useful to prevent false negatives from prematurely ending the object dection window.
   - The ideal value varies based on the `frame_check_interval`. I recommend a value of `4-6` for an interval of `2`
-- **min_detect_percent**: The minimum percentage of frames in which an object must be detected in its window to be considered present in the video. Helps eliminate false positives.
+- **min_detect_percent**: The minimum percentage of frames in which an object must be detected in its window to be considered present in the video. Helps eliminate false positives. Valid values are from `0-1`
 - **default_confidence_threshold**: The default confidence threshold for object detection. Objects detected with a confidence below this threshold will be ignored. Valid values are from `0-1`
 - **user_defined_confidence_thresholds**: Specific confidence thresholds for certain objects. If you want to have a higher threshold for a specific object, you can set it here. Valid values are from `0-1`
 - **enable_preprocessing**: If set to `true`, the video will undergo a histogram transformation as a pre-processing step. Useful if your video is abnormally dark. Off by default
