@@ -273,9 +273,9 @@ def main(video_path, position=1, input_directory="vods"):
             writer.release()
         
         # Organizing the output
-        with print_lock:
-            print(f"\n------------\nProcessed video: {filename}")
-            detected_object_names = [object_names.get(object_id, f"Error! Unknown object {object_id}") for object_id in detected_object_ids]
+        #with print_lock:
+            #print(f"\n------------\nProcessed video: {filename}")
+            #detected_object_names = [object_names.get(object_id, f"Error! Unknown object {object_id}") for object_id in detected_object_ids]
             #if detected_object_names:
                 #print("Detected objects:")
                 #for object_name in detected_object_names:
