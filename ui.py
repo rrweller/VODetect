@@ -57,7 +57,7 @@ class ChannelNameForm(npyscreen.ActionForm):
 
 class NewChannelForm(npyscreen.ActionPopup):
     def create(self):
-        self.channel_name = self.add(npyscreen.TitleText, name="Enter another channel or press enter to start download:")
+        self.channel_name = self.add(npyscreen.TitleText, name="Enter another channel or press ok to start download:")
 
     def beforeEditing(self):
         self.channel_name.value = ""
