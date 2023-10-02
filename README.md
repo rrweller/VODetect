@@ -22,9 +22,10 @@ VODetect is a powerful tool designed to download videos from YouTube and Twitch 
 1. Clone the repository:
 ``https://github.com/rrweller/VODetect``
 
-2. Visit https://pytorch.org/get-started/locally/ and copy the correct installation command *THIS IS VERY IMPORTANT AS TORCH IS A PAIN*
+2. Visit https://pytorch.org/get-started/locally/ and copy the correct installation command for your installed version of CUDA *THIS IS VERY IMPORTANT AS TORCH IS A PAIN*
+   - The program will default to using the CPU if mismatched versions of CUDA and torch are installed. If you have extremely slow inference this is why
 
-3. Edit the install.bat or install.sh file and replace the ``pip3 install torch torchvision torchaudio`` line with the install command you copied
+4. Edit the install.bat or install.sh file and replace the ``pip3 install torch torchvision torchaudio`` line with the install command you copied
 
 5. Run the ``install.bat`` or ``install.sh`` file
 
