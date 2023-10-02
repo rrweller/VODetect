@@ -2,6 +2,7 @@ import npyscreen
 import processor
 import twitch_downloader
 import youtube_downloader
+import youtube_downloader_shorts
 import threading
 import os
 
@@ -13,12 +14,13 @@ class App(npyscreen.NPSAppManaged):
         self.addForm("TWITCH", TwitchForm, name="Twitch Menu")
         self.addForm("YOUTUBE", YouTubeForm, name="YouTube Menu")
         self.addForm("FOLDERPROCESS", FolderProcessForm, name="Folder Process Menu")
+        self.addForm("YOUTUBESHORTS", YouTubeShortsForm, name="YouTube Shorts Menu")  # New form for YouTube Shorts
         self.addForm("CHANNELNAME", ChannelNameForm, name="Channel Selection")
         self.addForm("NEWCHANNEL", NewChannelForm, name="New Channel Selection")
 
 class MainMenuForm(npyscreen.ActionForm):
     def create(self):
-        self.source = self.add(npyscreen.TitleSelectOne, max_height=5, name="Choose Process Source", values=["Twitch", "YouTube", "Folder Process"], scroll_exit=True)
+        self.source = self.add(npyscreen.TitleSelectOne, max_height=6, name="Choose Process Source", values=["Twitch", "YouTube", "YouTube Shorts", "Folder Process"], scroll_exit=True)
 
     def on_ok(self):
         if self.source.value[0] == 0:  # Twitch
@@ -27,13 +29,15 @@ class MainMenuForm(npyscreen.ActionForm):
         elif self.source.value[0] == 1:  # YouTube
             self.parentApp.getForm("CHANNELNAME").source = "YouTube"
             self.parentApp.switchForm('CHANNELNAME')
-        elif self.source.value[0] == 2:  # Folder Process
+        elif self.source.value[0] == 2:  # YouTube Shorts
+            self.parentApp.getForm("CHANNELNAME").source = "YouTubeShorts"
+            self.parentApp.switchForm('CHANNELNAME')
+        elif self.source.value[0] == 3:  # Folder Process
             self.parentApp.switchForm('FOLDERPROCESS')
         else:
             self.parentApp.setNextForm(None)
-    
     def on_cancel(self):
-        self.parentApp.setNextForm(None)
+        self.parentApp.switchForm(None)
 
 class ChannelNameForm(npyscreen.ActionForm):
     def create(self):
@@ -49,6 +53,10 @@ class ChannelNameForm(npyscreen.ActionForm):
             youtube_form = self.parentApp.getForm("YOUTUBE")
             youtube_form.channel_name_value = self.channel_name.value
             self.parentApp.switchForm('YOUTUBE')
+        elif self.source == "YouTubeShorts":
+            shorts_form = self.parentApp.getForm("YOUTUBESHORTS")
+            shorts_form.channel_name_value = self.channel_name.value
+            self.parentApp.switchForm('YOUTUBESHORTS')
         else:
             self.parentApp.setNextForm(None)
 
@@ -57,7 +65,7 @@ class ChannelNameForm(npyscreen.ActionForm):
 
 class NewChannelForm(npyscreen.ActionPopup):
     def create(self):
-        self.channel_name = self.add(npyscreen.TitleText, name="Enter another channel or press ok to start download:")
+        self.channel_name = self.add(npyscreen.TitleText, name="Enter another channel or press enter to start download:")
 
     def beforeEditing(self):
         self.channel_name.value = ""
@@ -198,6 +206,72 @@ class YouTubeForm(npyscreen.ActionForm):
                 # Add the downloaded video to the queue for inference
                 processor.waiting_for_inference.put(video_file)
             # Put sentinel values for each inference worker thread to signal them to exit
+            for _ in range(processor.MAX_INFERENCE_THREADS):
+                processor.waiting_for_inference.put(None)
+
+        threading.Thread(target=download_and_infer).start()
+        self.parentApp.switchForm(None)
+
+    def on_cancel(self):
+        self.parentApp.switchForm('MAIN')
+
+#============== Youtube Shorts ==============
+class YouTubeShortsForm(npyscreen.ActionForm):
+    # This form is tailored for shorts.
+    def create(self):
+        self.channel_name_value = None
+        self.shorts = self.add(npyscreen.MultiSelect, name="Shorts", values=[], scroll_exit=True)
+        self.loaded_short_count = 0
+        self.selected_short_urls = []
+
+    def beforeEditing(self):
+        if self.channel_name_value:
+            self.load_shorts()
+
+    def on_ok(self):
+        if not self.shorts.values:
+            self.load_shorts()
+            return
+        elif "Load 20 More" in [self.shorts.values[i] for i in self.shorts.value]:
+            self.get_selected_shorts()
+            return
+        else:
+            self.get_selected_shorts()
+            
+            new_channel_form = self.parentApp.getForm("NEWCHANNEL")
+            new_channel_form.channel_name.value = ""
+            new_channel_form.edit()
+            new_channel = new_channel_form.channel_name.value
+            if new_channel:
+                self.channel_name_value = new_channel
+                self.loaded_short_count = 0
+            else:
+                self.start_download_and_inference()
+
+    def load_shorts(self):
+        # Call youtube_downloader_shorts.py functions
+        channel_shorts = youtube_downloader_shorts.get_latest_shorts(self.channel_name_value, start=self.loaded_short_count, count=20)
+        short_titles = [short[0] for short in channel_shorts] + ["Load 20 More"]
+        
+        self.shorts.value = []
+        self.shorts.values = short_titles
+        self.loaded_short_count += 20
+        self.shorts.cursor_line = 0
+        self.shorts.display()
+
+    def get_selected_shorts(self):
+        selected_shorts = [self.shorts.values[i] for i in self.shorts.value if i != len(self.shorts.values) - 1]
+        all_shorts = youtube_downloader_shorts.get_latest_shorts(self.channel_name_value, start=self.loaded_short_count - 20, count=20)
+        self.selected_short_urls.extend([url for title, url in all_shorts if title in selected_shorts])
+
+    def start_download_and_inference(self):
+        threading.Thread(target=processor.inference_worker).start()
+
+        def download_and_infer():
+            for url in self.selected_short_urls:
+                with print_lock:
+                    short_file = youtube_downloader_shorts.download_short(url)
+                processor.waiting_for_inference.put(short_file)
             for _ in range(processor.MAX_INFERENCE_THREADS):
                 processor.waiting_for_inference.put(None)
 

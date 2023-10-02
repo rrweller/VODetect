@@ -20,9 +20,9 @@ quality_codes = {
 format_code = quality_codes.get(desired_quality, "best")
 
 def download_video(link):
-    outtmpl = 'vods/%(title)s.%(ext)s'
-    if not os.path.exists('vods'):
-        os.makedirs('vods')
+    outtmpl = 'videos/%(title)s.%(ext)s'
+    if not os.path.exists('videos'):
+        os.makedirs('videos')
 
     # Define youtube_dl options
     ydl_opts = {
@@ -36,7 +36,7 @@ def download_video(link):
         filename = ydl.prepare_filename(info)
         return filename
 
-def get_latest_videos(channel_name, start=0, count=10):
+def get_latest_videos(channel_name, start=0, count=20):
     # Define youtube_dl options for extracting video details
     ydl_opts = {
         'quiet': True,
