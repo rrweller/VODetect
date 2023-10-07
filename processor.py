@@ -15,6 +15,7 @@ with open('config.json', 'r') as config_file:
 
 MAX_INFERENCE_THREADS = config["processor"]["MAX_INFERENCE_THREADS"]
 TARGET_SIZE = tuple(config["folder_processing"]["VIDEO_RESOLUTION"])
+FOLDER_RESIZE = config["folder_processing"]["RESIZE_VIDEOS"]
 
 # This semaphore will limit the number of active threads
 semaphore = threading.Semaphore(MAX_INFERENCE_THREADS)
@@ -40,7 +41,7 @@ def inference_worker():
         threading.Thread(target=run_inference, args=(video_file, position)).start()
         position += 1
 
-def process_folder(folder_path, common_size=(1920, 1080)):
+def process_folder(folder_path, common_size=TARGET_SIZE):
     # Check if the folder exists
     if not os.path.exists(folder_path):
         print("Folder does not exist.")
@@ -55,14 +56,19 @@ def process_folder(folder_path, common_size=(1920, 1080)):
     video_files = [os.path.join(folder_path, file) for file in os.listdir(folder_path) if file.lower().endswith(('.mp4', '.mkv', '.avi', '.mov', '.flv', '.wmv'))]
 
     # Resize videos and save them to the tmp folder
-    for video_file in video_files:
-        video_name = os.path.basename(video_file)
-        resized_video_path = os.path.join(tmp_folder, video_name)
-        if not os.path.exists(resized_video_path):  # Avoid re-resizing
-            print(f"Resizing video {video_name} to {common_size}...")
-            resize_video(video_file, resized_video_path, common_size)
-        print(f"Enqueued video: {resized_video_path}")
-        waiting_for_inference.put(resized_video_path)
+    if FOLDER_RESIZE:
+        for video_file in video_files:
+            video_name = os.path.basename(video_file)
+            resized_video_path = os.path.join(tmp_folder, video_name)
+            if not os.path.exists(resized_video_path):  # Avoid re-resizing
+                print(f"Resizing video {video_name} to {common_size}...")
+                resize_video(video_file, resized_video_path, common_size)
+            print(f"Enqueued video: {resized_video_path}")
+            waiting_for_inference.put(resized_video_path)
+    else:
+        for video_file in video_files:
+            print(f"Enqueued video: {video_file}")
+            waiting_for_inference.put(video_file)
 
     # Start the inference worker thread
     threading.Thread(target=inference_worker).start()
