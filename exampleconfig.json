@@ -1,9 +1,10 @@
 {
     "processor": {
-        "MAX_INFERENCE_THREADS": 4
+        "MAX_INFERENCE_THREADS": 2
     },
     "folder_processing": {
-        "VIDEO_RESOLUTION": [1920, 1080]
+        "VIDEO_RESOLUTION": [1920, 1080],
+        "RESIZE_VIDEOS": false
     },
     "twitch_downloader": {
         "CLIENT_ID": "ENTER CLIENT_ID HERE",
