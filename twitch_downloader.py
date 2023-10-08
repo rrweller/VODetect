@@ -63,6 +63,25 @@ def download_single_vod(channel_name, vod_id):
         return None
 
     print("\nDownload completed.")
+
+    trimming_config = config["twitch_downloader"]
+    if trimming_config["ENABLE_TRIMMING"]:
+        print("Trimming video...")
+        start_time_seconds = trimming_config["START_TIME_MINUTES"] * 60
+        end_time_seconds = trimming_config["END_TIME_MINUTES"] * 60
+
+        # Ensure end_time is after start_time
+        if end_time_seconds <= start_time_seconds:
+            print("Error: END_TIME_MINUTES is not greater than START_TIME_MINUTES. Skipping trimming.")
+        else:
+            trimmed_output_path = os.path.join(root_directory, "vods", f"trimmed_{vod_id}.mp4")
+            success = trim_video(output_path, start_time_seconds, end_time_seconds, trimmed_output_path)
+            if success:
+                print(f"Trimmed video saved to {trimmed_output_path}")
+                return trimmed_output_path  # Return the path to the trimmed video
+            else:
+                print("Failed to trim video.")
+
     return output_path
 
 def get_user_id(channel_name):
@@ -104,6 +123,15 @@ def get_latest_vods(channel_name, num_vods=10, after_cursor=None):
 
     after_cursor = data['pagination'].get('cursor', None) if 'pagination' in data else None
     return [(vod['title'], vod['id']) for vod in data['data']], after_cursor
+
+def trim_video(input_path, start_time, end_time, output_path):
+    cmd = f"ffmpeg -y -i {input_path} -ss {start_time} -to {end_time} -c:v copy -c:a copy {output_path}"
+    process = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if process.returncode == 0:
+        return True
+    else:
+        print(f"Error trimming video: {process.stderr.decode('utf-8')}")
+        return False
 
 if __name__ == "__main__":
     try:
