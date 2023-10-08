@@ -48,12 +48,16 @@ VODetect is a powerful tool designed to download videos from YouTube and Twitch 
 
 ### Folder Processing
 - **VIDEO_RESOLUTION**: The target resolution `[width, height]` to which all videos in a directory will be resized to when the script is in folder processing mode.
+- **RESIZE_VIDEOS**: Enables or disabled video resizing
 
 ### Twitch Downloader
 - **CLIENT_ID**: Your Twitch application's client ID. This is required to make API requests to Twitch.
 - **OAUTH_TOKEN**: Your Twitch OAuth token. This is required for authentication when making certain API requests to Twitch. Use the `request_oauth.py` script to obtain one.
 - **DESIRED_QUALITY**: The desired quality/resolution of the Twitch VODs you want to download (e.g., "720p").
   - Valid values are ``1080p``,``720p``,``480p``,and ``360p``,
+- **ENABLE_TRIMMING**: Enables VOD trimming to avoid processing an entire VOD
+- **START_TIME_MINUTES**: Chooses the start time in minutes of the VOD to trim at
+- **END_TIME_MINUTES**: Chooses the end time in minutes of the VOD to end trimming at
 
 ### YouTube Downloader
 - **DESIRED_QUALITY**: The desired quality/resolution of the YouTube videos you want to download (e.g., "720p").
