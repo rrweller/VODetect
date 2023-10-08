@@ -9,7 +9,10 @@
     "twitch_downloader": {
         "CLIENT_ID": "ENTER CLIENT_ID HERE",
         "OAUTH_TOKEN": "ENTER OAUTH_TOKEN HERE (use request_oauth.py to get one)",
-        "DESIRED_QUALITY": "720p"
+                "DESIRED_QUALITY": "720p",
+        "ENABLE_TRIMMING": false,
+        "START_TIME_MINUTES": 0,
+        "END_TIME_MINUTES": 60
     },
     "youtube_downloader": {
         "DESIRED_QUALITY": "720p"
