@@ -1,6 +1,7 @@
 import os
 import threading
 import twitch_downloader
+import twitch_autodownloader
 import youtube_downloader
 import inference
 import time
@@ -40,6 +41,16 @@ def inference_worker():
         semaphore.acquire()
         threading.Thread(target=run_inference, args=(video_file, position)).start()
         position += 1
+
+def get_twitch_channels_status():
+    channel_names = config["twitch_autodownloader"]["channels"]
+    channel_status = {}
+    
+    for channel in channel_names:
+        status = twitch_autodownloader.check_channel_status(channel)
+        channel_status[channel] = status
+
+    return channel_status
 
 def process_folder(folder_path, common_size=TARGET_SIZE):
     # Check if the folder exists

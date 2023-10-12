@@ -14,6 +14,12 @@
         "START_TIME_MINUTES": 0,
         "END_TIME_MINUTES": 60
     },
+	"twitch_autodownloader": {
+        "channels": [
+            "ENTER CHANNELS HERE",
+        ],
+        "CHECK_INTERVAL_SECONDS": 60
+    },
     "youtube_downloader": {
         "DESIRED_QUALITY": "720p"
     },

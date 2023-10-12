@@ -1,6 +1,7 @@
 import npyscreen
 import processor
 import twitch_downloader
+import twitch_autodownloader
 import youtube_downloader
 import youtube_downloader_shorts
 import threading
@@ -10,6 +11,7 @@ print_lock = threading.Lock()
 
 class App(npyscreen.NPSAppManaged):
     def onStart(self):
+        npyscreen.setTheme(CustomColorTheme)
         self.addForm("MAIN", MainMenuForm, name="Main Menu")
         self.addForm("TWITCH", TwitchForm, name="Twitch Menu")
         self.addForm("YOUTUBE", YouTubeForm, name="YouTube Menu")
@@ -17,22 +19,25 @@ class App(npyscreen.NPSAppManaged):
         self.addForm("YOUTUBESHORTS", YouTubeShortsForm, name="YouTube Shorts Menu")  # New form for YouTube Shorts
         self.addForm("CHANNELNAME", ChannelNameForm, name="Channel Selection")
         self.addForm("NEWCHANNEL", NewChannelForm, name="New Channel Selection")
+        self.addForm("TWITCHAUTODOWNLOADER", TwitchAutoDownloaderForm, name="Twitch Auto-Downloader")
 
 class MainMenuForm(npyscreen.ActionForm):
     def create(self):
-        self.source = self.add(npyscreen.TitleSelectOne, max_height=6, name="Choose Process Source", values=["Twitch", "YouTube", "YouTube Shorts", "Folder Process"], scroll_exit=True)
+        self.source = self.add(npyscreen.TitleSelectOne, max_height=6, name="Choose Process Source", values=["Twitch", "Twitch Auto Downloader", "YouTube", "YouTube Shorts", "Folder Process"], scroll_exit=True)
 
     def on_ok(self):
         if self.source.value[0] == 0:  # Twitch
             self.parentApp.getForm("CHANNELNAME").source = "Twitch"
             self.parentApp.switchForm('CHANNELNAME')
-        elif self.source.value[0] == 1:  # YouTube
+        elif self.source.value[0] == 1:  # Twitch Auto-downloader
+            self.parentApp.switchForm('TWITCHAUTODOWNLOADER')
+        elif self.source.value[0] == 2:  # YouTube
             self.parentApp.getForm("CHANNELNAME").source = "YouTube"
             self.parentApp.switchForm('CHANNELNAME')
-        elif self.source.value[0] == 2:  # YouTube Shorts
+        elif self.source.value[0] == 3:  # YouTube Shorts
             self.parentApp.getForm("CHANNELNAME").source = "YouTubeShorts"
             self.parentApp.switchForm('CHANNELNAME')
-        elif self.source.value[0] == 3:  # Folder Process
+        elif self.source.value[0] == 4:  # Folder Process
             self.parentApp.switchForm('FOLDERPROCESS')
         else:
             self.parentApp.setNextForm(None)
@@ -69,7 +74,6 @@ class NewChannelForm(npyscreen.ActionPopup):
 
     def beforeEditing(self):
         self.channel_name.value = ""
-
 
 #============== Twitch ==============
 class TwitchForm(npyscreen.ActionForm):
@@ -281,6 +285,35 @@ class YouTubeShortsForm(npyscreen.ActionForm):
     def on_cancel(self):
         self.parentApp.switchForm('MAIN')
 
+#============== Twitch Auto-downloader ==============
+class TwitchAutoDownloaderForm(npyscreen.FormBaseNew):
+    def create(self):
+        y, x = self.useable_space()
+        self.channel_lines = []
+        self.load_channels()
+        self.exit_button = self.add(npyscreen.ButtonPress, name="Exit", rely=y-3)
+        self.exit_button.whenPressed = self.on_exit
+
+    def load_channels(self):
+        channel_status = processor.get_twitch_channels_status()
+        rely = 2  # Starting position
+
+        for channel, status in channel_status.items():
+            display_str = f"{channel}: {status}"
+            if status == "offline":
+                color = 'DANGER'
+            elif status == "online":
+                color = 'GOOD'
+            else:
+                color = 'DEFAULT'
+            
+            channel_line = self.add(npyscreen.Textfield, value=display_str, rely=rely, color=color, editable=False)
+            self.channel_lines.append(channel_line)
+            rely += 1  # Increment position for next line
+
+    def on_exit(self):
+        self.parentApp.switchForm(None)
+
 #============== Folder ==============
 class FolderProcessForm(npyscreen.ActionForm):
     def create(self):
@@ -295,6 +328,14 @@ class FolderProcessForm(npyscreen.ActionForm):
 
     def on_cancel(self):
         self.parentApp.switchForm('MAIN')
+
+class CustomColorTheme(npyscreen.ThemeManager):
+    default_colors = {
+        'DEFAULT': 'WHITE_BLACK',
+        'WARNING': 'YELLOW_BLACK',
+        'DANGER': 'RED_BLACK',
+        'GOOD': 'GREEN_BLACK',
+    }
 
 def main():
     app = App()
