@@ -6,6 +6,7 @@ import youtube_downloader
 import youtube_downloader_shorts
 import threading
 import os
+import sys
 
 print_lock = threading.Lock()
 
@@ -129,7 +130,7 @@ class TwitchForm(npyscreen.ActionForm):
 
     def start_download_and_inference(self):
         # Start the inference worker thread
-        threading.Thread(target=processor.inference_worker).start()
+        threading.Thread(target=processor.inference_worker,daemon=True).start()
 
         def download_and_infer():
             print(f"VOD IDs to download: {self.selected_vod_ids}")  # Debug line
@@ -142,7 +143,7 @@ class TwitchForm(npyscreen.ActionForm):
             for _ in range(processor.MAX_INFERENCE_THREADS):
                 processor.waiting_for_inference.put(None)
 
-        threading.Thread(target=download_and_infer).start()
+        threading.Thread(target=download_and_infer,daemon=True).start()
         self.parentApp.switchForm(None)
 
     def on_cancel(self):
@@ -201,7 +202,7 @@ class YouTubeForm(npyscreen.ActionForm):
 
     def start_download_and_inference(self):
         # Start the inference worker thread
-        threading.Thread(target=processor.inference_worker).start()
+        threading.Thread(target=processor.inference_worker,daemon=True).start()
 
         def download_and_infer():
             for url in self.selected_video_urls:
@@ -213,7 +214,7 @@ class YouTubeForm(npyscreen.ActionForm):
             for _ in range(processor.MAX_INFERENCE_THREADS):
                 processor.waiting_for_inference.put(None)
 
-        threading.Thread(target=download_and_infer).start()
+        threading.Thread(target=download_and_infer,daemon=True).start()
         self.parentApp.switchForm(None)
 
     def on_cancel(self):
@@ -269,7 +270,7 @@ class YouTubeShortsForm(npyscreen.ActionForm):
         self.selected_short_urls.extend([url for title, url in all_shorts if title in selected_shorts])
 
     def start_download_and_inference(self):
-        threading.Thread(target=processor.inference_worker).start()
+        threading.Thread(target=processor.inference_worker,daemon=True).start()
 
         def download_and_infer():
             for url in self.selected_short_urls:
@@ -279,7 +280,7 @@ class YouTubeShortsForm(npyscreen.ActionForm):
             for _ in range(processor.MAX_INFERENCE_THREADS):
                 processor.waiting_for_inference.put(None)
 
-        threading.Thread(target=download_and_infer).start()
+        threading.Thread(target=download_and_infer,daemon=True).start()
         self.parentApp.switchForm(None)
 
     def on_cancel(self):
@@ -288,11 +289,19 @@ class YouTubeShortsForm(npyscreen.ActionForm):
 #============== Twitch Auto-downloader ==============
 class TwitchAutoDownloaderForm(npyscreen.FormBaseNew):
     def create(self):
+        self.threads = []  # List to keep track of all threads
+        self.stop_thread = False  # Control attribute for the thread
         y, x = self.useable_space()
         self.channel_lines = []
         self.load_channels()
         self.exit_button = self.add(npyscreen.ButtonPress, name="Exit", rely=y-3)
         self.exit_button.whenPressed = self.on_exit
+
+    def while_editing(self, *args, **keywords):
+        # Start the channel monitoring thread only when the user is on this form
+        if not hasattr(self, "monitoring_thread"):
+            self.monitoring_thread = threading.Thread(target=processor.monitor_channels, args=(self,),daemon=True)
+            self.monitoring_thread.start()
 
     def load_channels(self):
         channel_status = processor.get_twitch_channels_status()
@@ -312,6 +321,12 @@ class TwitchAutoDownloaderForm(npyscreen.FormBaseNew):
             rely += 1  # Increment position for next line
 
     def on_exit(self):
+        self.stop_thread = True  # Signal the thread to stop
+        for channel in processor.channel_flags.keys():
+            twitch_autodownloader.stop_download(channel)
+        self.monitoring_thread.join()  # Wait for the monitoring thread to finish
+        for thread in self.threads:
+            thread.join()  # Wait for each thread to finish
         self.parentApp.switchForm(None)
 
 #============== Folder ==============
@@ -338,8 +353,14 @@ class CustomColorTheme(npyscreen.ThemeManager):
     }
 
 def main():
-    app = App()
-    app.run()
+    try:
+        app = App()
+        app.run()
+    except KeyboardInterrupt:
+        # Handle manual interruption gracefully
+        print("Gracefully shutting down...")
+        # Additional cleanup code if needed
+        sys.exit(0)
 
 if __name__ == "__main__":
     main()

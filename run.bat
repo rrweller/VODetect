@@ -2,4 +2,4 @@
 cd venv\Scripts
 call activate
 cd ..\..
-python ui.py
+start /wait python ui.py

@@ -1,67 +1,68 @@
 import requests
 import json
 import subprocess
+import os
+import time
+import streamlink
+import sys
 
 with open('config.json', 'r') as config_file:
     config = json.load(config_file)
 
-CLIENT_ID = config["twitch_downloader"]["CLIENT_ID"]
-OAUTH_TOKEN = config["twitch_downloader"]["OAUTH_TOKEN"]
+OUTPUT_DIR = "vods"
+ffmpeg_processes = {}
 
-def get_m3u8_link(channel_name, client_id, oauth_token):
-    # 1. Get the channel's ID
-    HEADERS = {
-        'Client-ID': CLIENT_ID,
-        'Authorization': f"Bearer {OAUTH_TOKEN}"
-    }
-    response = requests.get(f"https://api.twitch.tv/helix/users?login={channel_name}", headers=headers)
-    user_data = response.json()
-    user_id = user_data['data'][0]['id']
+if not os.path.exists(OUTPUT_DIR):
+    os.makedirs(OUTPUT_DIR)
 
-    # 2. Get the access token and signature
-    access_response = requests.get(f"https://api.twitch.tv/api/channels/{channel_name}/access_token")
-    access_data = json.loads(access_response.text)
-    token = access_data['token']
-    sig = access_data['sig']
-
-    # 3. Get the m3u8 link
-    m3u8_response = requests.get(f"https://usher.ttvnw.net/api/channel/hls/{channel_name}.m3u8?player=twitchweb&&token={token}&sig={sig}&allow_audio_only=true&allow_source=true&type=any&p=12345")
-    m3u8_link = m3u8_response.text.split('\n')[2]  # This might need adjustment based on the response structure
-
-    return m3u8_link
-
-def download_stream(m3u8_link, output_path):
-    cmd = [
-        'ffmpeg', 
-        '-i', m3u8_link, 
-        '-c', 'copy', 
-        '-bsf:a', 'aac_adtstoasc', 
-        output_path
-    ]
-    subprocess.run(cmd, check=True)
+def get_stream_url(channel_name):
+    try:
+        streams = streamlink.streams(f'https://www.twitch.tv/{channel_name}')
+        if 'best' in streams:
+            return streams['best'].url
+        else:
+            return None
+    except Exception as e:
+        print(f"Error fetching stream URL for channel {channel_name}: {e}")
+        return None
 
 def check_channel_status(channel_name):
-    # Check if the channel is online or offline using the Twitch API
-    HEADERS = {
-        'Client-ID': CLIENT_ID,
-        'Authorization': f"Bearer {OAUTH_TOKEN}"
-    }
-    response = requests.get(f"https://api.twitch.tv/helix/streams?user_login={channel_name}", headers=HEADERS)
-    
-    # Check if the request was successful
-    if response.status_code != 200:
-        print(f"Error fetching data for channel {channel_name}. Status code: {response.status_code}. Response: {response.text}")
+    try:
+        streams = streamlink.streams(f'https://www.twitch.tv/{channel_name}')
+        if streams:
+            return "online"
+        else:
+            return "offline"
+    except Exception as e:
+        print(f"Error checking status for channel {channel_name}: {e}")
         return "error"
 
-    data = response.json()
+def download_stream(channel_name):
+    stream_url = get_stream_url(channel_name)
+    if not stream_url:
+        print(f"Failed to get stream URL for {channel_name}.")
+        return
 
-    # Check if the 'data' key exists in the response
-    if "data" not in data:
-        print(f"Unexpected response format for channel {channel_name}. Response: {response.text}")
-        return "error"
+    output_path = generate_output_path(channel_name)
+    print(f"Downloading stream for {channel_name} to {output_path}...")
+    process = subprocess.Popen(["ffmpeg", "-i", stream_url, "-c", "copy", output_path])
+    ffmpeg_processes[channel_name] = process
 
-    if data["data"]:
-        return "online"
-    else:
-        return "offline"
+def generate_output_path(channel_name):
+    filename = f"{channel_name}_{time.strftime('%Y%m%d%H%M%S')}.mp4"
+    return os.path.join(OUTPUT_DIR, filename)
 
+def stop_download(channel_name):
+    if channel_name in ffmpeg_processes:
+        if sys.platform == "win32":
+            os.kill(ffmpeg_processes[channel_name].pid, subprocess.signal.CTRL_C_EVENT)
+        else:
+            ffmpeg_processes[channel_name].send_signal(subprocess.signal.SIGINT)
+        # Remove the wait() method to avoid blocking
+        del ffmpeg_processes[channel_name]
+
+if __name__ == "__main__":
+    # Example usage
+    channel = "example_channel"
+    if check_channel_status(channel) == "online":
+        download_stream(channel)
