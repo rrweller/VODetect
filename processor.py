@@ -40,7 +40,7 @@ def inference_worker():
             # Sentinel value to exit the thread
             break
         semaphore.acquire()
-        threading.Thread(target=run_inference, args=(video_file, position),daemon=True).start()
+        threading.Thread(target=run_inference, args=(video_file, position)).start()
         position += 1
 
 def get_twitch_channels_status():
