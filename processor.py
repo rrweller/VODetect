@@ -61,7 +61,7 @@ def monitor_channels(form):
             # If channel is live and not currently being downloaded
             if status == "online" and not channel_flags.get(channel, False):
                 channel_flags[channel] = True
-                thread = threading.Thread(target=start_ffmpeg_download, args=(channel,),daemon=True)
+                thread = threading.Thread(target=start_ffmpeg_download, args=(channel,))
                 thread.start()
                 form.threads.append(thread)
             # If channel was live but is now offline
@@ -107,7 +107,7 @@ def process_folder(folder_path, common_size=TARGET_SIZE):
             waiting_for_inference.put(video_file)
 
     # Start the inference worker thread
-    threading.Thread(target=inference_worker,daemon=True).start()
+    threading.Thread(target=inference_worker).start()
 
     # Put sentinel values for each inference worker thread to signal them to exit after all videos are processed
     for _ in range(MAX_INFERENCE_THREADS):

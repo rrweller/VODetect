@@ -130,7 +130,7 @@ class TwitchForm(npyscreen.ActionForm):
 
     def start_download_and_inference(self):
         # Start the inference worker thread
-        threading.Thread(target=processor.inference_worker,daemon=True).start()
+        threading.Thread(target=processor.inference_worker).start()
 
         def download_and_infer():
             print(f"VOD IDs to download: {self.selected_vod_ids}")  # Debug line
@@ -143,7 +143,7 @@ class TwitchForm(npyscreen.ActionForm):
             for _ in range(processor.MAX_INFERENCE_THREADS):
                 processor.waiting_for_inference.put(None)
 
-        threading.Thread(target=download_and_infer,daemon=True).start()
+        threading.Thread(target=download_and_infer).start()
         self.parentApp.switchForm(None)
 
     def on_cancel(self):
@@ -202,7 +202,7 @@ class YouTubeForm(npyscreen.ActionForm):
 
     def start_download_and_inference(self):
         # Start the inference worker thread
-        threading.Thread(target=processor.inference_worker,daemon=True).start()
+        threading.Thread(target=processor.inference_worker).start()
 
         def download_and_infer():
             for url in self.selected_video_urls:
@@ -214,7 +214,7 @@ class YouTubeForm(npyscreen.ActionForm):
             for _ in range(processor.MAX_INFERENCE_THREADS):
                 processor.waiting_for_inference.put(None)
 
-        threading.Thread(target=download_and_infer,daemon=True).start()
+        threading.Thread(target=download_and_infer).start()
         self.parentApp.switchForm(None)
 
     def on_cancel(self):
@@ -270,7 +270,7 @@ class YouTubeShortsForm(npyscreen.ActionForm):
         self.selected_short_urls.extend([url for title, url in all_shorts if title in selected_shorts])
 
     def start_download_and_inference(self):
-        threading.Thread(target=processor.inference_worker,daemon=True).start()
+        threading.Thread(target=processor.inference_worker).start()
 
         def download_and_infer():
             for url in self.selected_short_urls:
@@ -280,7 +280,7 @@ class YouTubeShortsForm(npyscreen.ActionForm):
             for _ in range(processor.MAX_INFERENCE_THREADS):
                 processor.waiting_for_inference.put(None)
 
-        threading.Thread(target=download_and_infer,daemon=True).start()
+        threading.Thread(target=download_and_infer).start()
         self.parentApp.switchForm(None)
 
     def on_cancel(self):
@@ -300,7 +300,7 @@ class TwitchAutoDownloaderForm(npyscreen.FormBaseNew):
     def while_editing(self, *args, **keywords):
         # Start the channel monitoring thread only when the user is on this form
         if not hasattr(self, "monitoring_thread"):
-            self.monitoring_thread = threading.Thread(target=processor.monitor_channels, args=(self,),daemon=True)
+            self.monitoring_thread = threading.Thread(target=processor.monitor_channels, args=(self,))
             self.monitoring_thread.start()
 
     def load_channels(self):
