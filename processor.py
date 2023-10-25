@@ -36,7 +36,7 @@ def run_inference(video_file, position=0):
     try:
         inference.main(video_file, position, input_directory=directory)
     finally:
-        print(f"Releasing semaphore for {video_file}.")
+        #print(f"Releasing semaphore for {video_file}.")
         #get channel name from video_file
         base_name = os.path.basename(video_file)
         channel_name = base_name.split('_')[0]
@@ -60,7 +60,7 @@ def inference_worker():
             break
             
         print(f"Starting inference on {video_file}.")
-        print("Trying to acquire semaphore.")
+        #print("Trying to acquire semaphore.")
         semaphore.acquire()
         threading.Thread(target=run_inference, args=(video_file, position)).start()
         position += 1
