@@ -29,7 +29,6 @@ def get_stream_url(channel_name):
 
 def check_channel_status(channel_name, channel_status):
     if channel_status != "inference":
-        print(f"Not inferencing channel {channel_name}. Checking status...")
         try:
             streams = streamlink.streams(f'https://www.twitch.tv/{channel_name}')
             if streams:

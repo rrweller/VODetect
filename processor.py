@@ -87,7 +87,6 @@ def set_channel_status(channel, status):
 def monitor_channels(form):
     global channel_flags
     while not form.stop_thread:
-        print("Checking channel statuses...")
         channel_status = get_twitch_channels_status()
         for channel, status in channel_status.items():
 
