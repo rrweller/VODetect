@@ -19,63 +19,129 @@ TARGET_SIZE = tuple(config["folder_processing"]["VIDEO_RESOLUTION"])
 FOLDER_RESIZE = config["folder_processing"]["RESIZE_VIDEOS"]
 TWITCH_OUTPUT_DIR = "vods"
 channel_flags = {}
+#channel_status = {}
+STOP_MONITORING = False
+STOP_INFERENCE = False
 
 # This semaphore will limit the number of active threads
 semaphore = threading.Semaphore(MAX_INFERENCE_THREADS)
 print_lock = threading.Lock()
 waiting_for_inference = queue.Queue()
 
+channel_names = config["twitch_autodownloader"]["channels"]
+channel_status = {channel: 'offline' for channel in channel_names}
+
 def run_inference(video_file, position=0):
     directory = os.path.dirname(video_file)  # Extract the directory from the video_file path
     try:
         inference.main(video_file, position, input_directory=directory)
     finally:
+        print(f"Releasing semaphore for {video_file}.")
+        #get channel name from video_file
+        base_name = os.path.basename(video_file)
+        channel_name = base_name.split('_')[0]
+        set_channel_status(channel_name, "offline")
+        print(f"Set {channel_name} status to offline because inference was complete.")
         semaphore.release()
 
 def inference_worker():
+    global channel_status
+    #print("Inference worker started.")
     position = 1
     while True:
         video_file = waiting_for_inference.get()
-        if video_file is None:
-            # Sentinel value to exit the thread
+        
+        if STOP_INFERENCE or video_file is None:  # Check the flag here
+            #print("Inference worker exiting.")
+            #get channel name from video_file
+            #channel_name = video_file.split('_')[0]
+            #set_channel_status(channel_name, "offline")
+            #print(f"Set {channel_name} status to offline because inference was complete.")
             break
+            
+        print(f"Starting inference on {video_file}.")
+        print("Trying to acquire semaphore.")
         semaphore.acquire()
         threading.Thread(target=run_inference, args=(video_file, position)).start()
         position += 1
 
 def get_twitch_channels_status():
-    channel_names = config["twitch_autodownloader"]["channels"]
-    channel_status = {}
+    global STOP_MONITORING, channel_status
+    
+    if STOP_MONITORING:
+        print("Stopping channel monitoring.")
+        for channel in channel_names:
+            set_channel_status(channel, "offline")
+        return channel_status
     
     for channel in channel_names:
-        status = twitch_autodownloader.check_channel_status(channel)
+        status = twitch_autodownloader.check_channel_status(channel, channel_status[channel])
         channel_status[channel] = status
 
     return channel_status
 
+def set_channel_status(channel, status):
+    global channel_status
+    channel_status[channel] = status
+
 def monitor_channels(form):
     global channel_flags
     while not form.stop_thread:
+        print("Checking channel statuses...")
         channel_status = get_twitch_channels_status()
         for channel, status in channel_status.items():
+
             # If channel is live and not currently being downloaded
             if status == "online" and not channel_flags.get(channel, False):
+                print(f"Starting download for {channel}")
                 channel_flags[channel] = True
-                thread = threading.Thread(target=start_ffmpeg_download, args=(channel,))
+                thread = threading.Thread(target=start_live_download, args=(channel,))
                 thread.start()
                 form.threads.append(thread)
+
             # If channel was live but is now offline
             elif status == "offline" and channel_flags.get(channel, False):
+                print(f"Stopping download for {channel}")
                 channel_flags[channel] = False
-        time.sleep(config["twitch_autodownloader"]["CHECK_INTERVAL"])  # Sleep for N seconds
+                twitch_autodownloader.stop_download(channel)  # Stop only the download for this specific channel
 
+                # Explicitly start inference here
+                output_path = twitch_autodownloader.generate_output_path(channel)  # Assuming this function generates the same path as before
+                if not STOP_INFERENCE and output_path:  # Check the flag and if output_path is not None
+                    waiting_for_inference.put(output_path)
+                    set_channel_status(channel, "inference")
+                    print(f"Explicitly set {channel} status to {channel_status[channel]}.")
+                    print(f"Explicitly added {output_path} to the inference queue.")
 
-def start_ffmpeg_download(channel):
+        time.sleep(config["twitch_autodownloader"]["CHECK_INTERVAL"])
+        
+        if form.stop_thread:
+            print("Stopping channel monitoring thread.")
+            break
+
+def start_live_download(channel):
     try:
-        twitch_autodownloader.download_stream(channel)
+        output_path = twitch_autodownloader.download_stream(channel)
+        if output_path:
+            if not STOP_INFERENCE:  # Check the flag here
+                # Add the downloaded video to the queue for inference
+                waiting_for_inference.put(output_path)
+                set_channel_status(channel, "inference")
+                print(f"Set {channel} status to {channel_status[channel]}.")
+                print(f"Added {output_path} to the inference queue.")
     finally:
         # Update the flag when the download is finished
         channel_flags[channel] = False
+
+def stop_all_downloads():
+    for channel in channel_flags.keys():
+        twitch_autodownloader.stop_download(channel)
+
+def stop_all_processing():
+    global STOP_MONITORING
+    STOP_MONITORING = True
+    for _ in range(MAX_INFERENCE_THREADS):
+        waiting_for_inference.put(None)
 
 def process_folder(folder_path, common_size=TARGET_SIZE):
     # Check if the folder exists

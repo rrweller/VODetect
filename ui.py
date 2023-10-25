@@ -7,10 +7,16 @@ import youtube_downloader_shorts
 import threading
 import os
 import sys
+import subprocess
+from processor import channel_flags
+import time
 
 print_lock = threading.Lock()
 
 class App(npyscreen.NPSAppManaged):
+    def __init__(self, *args, **kwargs):
+            super(App, self).__init__(*args, **kwargs)
+            self.threads = []
     def onStart(self):
         npyscreen.setTheme(CustomColorTheme)
         self.addForm("MAIN", MainMenuForm, name="Main Menu")
@@ -84,10 +90,14 @@ class TwitchForm(npyscreen.ActionForm):
         self.after_cursor = None
         self.loaded_vod_count = 0
         self.selected_vod_ids = []  # List to store all selected VOD IDs
+        self.loaded_vods = []  # Initialize loaded_vods
 
     def beforeEditing(self):
         if self.channel_name_value:
-            self.loaded_vods, self.after_cursor = self.load_vods()  # Store the loaded VODs in self.loaded_vods
+            try:
+                self.loaded_vods, self.after_cursor = self.load_vods()  # Handle the return value
+            except Exception as e:
+                npyscreen.notify_confirm(str(e), title='Error', wrap=True)
 
     def on_ok(self):
         if not self.vods.values:
@@ -149,6 +159,89 @@ class TwitchForm(npyscreen.ActionForm):
     def on_cancel(self):
         self.parentApp.switchForm('MAIN')
 
+#============== Twitch Auto-downloader ==============
+class TwitchAutoDownloaderForm(npyscreen.FormBaseNew):
+    def create(self):
+        self.threads = []  # List to keep track of all threads
+        self.stop_thread = False  # Control attribute for the thread
+        y, x = self.useable_space()
+        self.channel_lines = []
+        self.load_channels()
+        self.stop_downloads_button = self.add(npyscreen.ButtonPress, name="Stop Downloads", rely=y-4)
+        self.stop_downloads_button.whenPressed = self.on_stop_downloads
+        self.exit_button = self.add(npyscreen.ButtonPress, name="Exit", rely=y-3)
+        self.exit_button.whenPressed = self.on_exit
+
+    def while_editing(self, *args, **keywords):
+        # Start the channel monitoring thread only when the user is on this form
+        threading.Thread(target=processor.inference_worker).start()
+        if not hasattr(self, "monitoring_thread"):
+            print("Starting channel monitoring thread.")
+            self.monitoring_thread = threading.Thread(target=processor.monitor_channels, args=(self,))
+            self.parentApp.threads.append(self.monitoring_thread)
+            self.monitoring_thread.start()
+        # Start a thread to periodically refresh the UI
+        if not hasattr(self, "refresh_thread"):
+            self.refresh_thread = threading.Thread(target=self.periodic_refresh)
+            self.refresh_thread.start()
+
+    def periodic_refresh(self):
+        while not self.stop_thread:
+            self.load_channels()
+            time.sleep(1)  # Refresh every second, adjust as needed
+
+    def load_channels(self):
+        rely = 2  # Starting position 
+        channel_status = processor.channel_status
+
+        # Clear and update channel lines in the same loop
+        for channel, status in channel_status.items():
+            # Clear the line
+            clear_str = " " * 50  # Assuming a width of 50 characters, adjust as needed
+            self.add(npyscreen.Textfield, value=clear_str, rely=rely, editable=False)
+            
+            # Update the line
+            display_str = f"{channel}: {status}"
+            color = 'DEFAULT'  # Initialize to a default value
+
+            if status == "offline":
+                color = 'DANGER'
+            elif status == "online":
+                color = 'GOOD'
+            elif status == "inference":
+                color = 'WARNING'
+                
+            channel_line = self.add(npyscreen.Textfield, value=display_str, rely=rely, color=color, editable=False)
+            self.channel_lines.append(channel_line)
+            rely += 1  # Increment position for next line
+
+        self.display()
+ 
+    def on_stop_downloads(self):
+        self.stop_thread = True
+        processor.STOP_MONITORING = True
+        for channel in processor.channel_flags.keys():
+            try:
+                twitch_autodownloader.stop_download(channel)
+            except Exception as e:
+                print(f"An error occurred while stopping the download for {channel}: {e}")
+        print("Joining threads")
+        for thread in self.threads:
+            thread.join()  # Wait for the thread to complete
+    
+    def on_exit(self):
+        self.stop_thread = True  # Signal the thread to stop
+        processor.STOP_MONITORING = True
+        processor.STOP_INFERENCE = True
+        for channel in processor.channel_flags.keys():
+            twitch_autodownloader.stop_download(channel)
+        self.monitoring_thread.join()  # Wait for the monitoring thread to finish
+        for _ in range(processor.MAX_INFERENCE_THREADS):
+            processor.waiting_for_inference.put(None)
+        for thread in self.threads:
+            thread.join()  # Wait for each thread to finish
+        self.parentApp.switchForm(None)
+
 #============== Youtube ==============
 class YouTubeForm(npyscreen.ActionForm):
     def create(self):
@@ -159,7 +252,10 @@ class YouTubeForm(npyscreen.ActionForm):
 
     def beforeEditing(self):
         if self.channel_name_value:
-            self.load_videos()
+            try:
+                self.load_videos()  # Assuming load_videos now returns something you handle
+            except Exception as e:
+                npyscreen.notify_confirm(str(e), title='Error', wrap=True)
 
     def on_ok(self):
         if not self.videos.values:
@@ -231,7 +327,10 @@ class YouTubeShortsForm(npyscreen.ActionForm):
 
     def beforeEditing(self):
         if self.channel_name_value:
-            self.load_shorts()
+            try:
+                self.load_shorts()  # Assuming load_shorts now returns something you handle
+            except Exception as e:
+                npyscreen.notify_confirm(str(e), title='Error', wrap=True)
 
     def on_ok(self):
         if not self.shorts.values:
@@ -286,49 +385,6 @@ class YouTubeShortsForm(npyscreen.ActionForm):
     def on_cancel(self):
         self.parentApp.switchForm('MAIN')
 
-#============== Twitch Auto-downloader ==============
-class TwitchAutoDownloaderForm(npyscreen.FormBaseNew):
-    def create(self):
-        self.threads = []  # List to keep track of all threads
-        self.stop_thread = False  # Control attribute for the thread
-        y, x = self.useable_space()
-        self.channel_lines = []
-        self.load_channels()
-        self.exit_button = self.add(npyscreen.ButtonPress, name="Exit", rely=y-3)
-        self.exit_button.whenPressed = self.on_exit
-
-    def while_editing(self, *args, **keywords):
-        # Start the channel monitoring thread only when the user is on this form
-        if not hasattr(self, "monitoring_thread"):
-            self.monitoring_thread = threading.Thread(target=processor.monitor_channels, args=(self,))
-            self.monitoring_thread.start()
-
-    def load_channels(self):
-        channel_status = processor.get_twitch_channels_status()
-        rely = 2  # Starting position
-
-        for channel, status in channel_status.items():
-            display_str = f"{channel}: {status}"
-            if status == "offline":
-                color = 'DANGER'
-            elif status == "online":
-                color = 'GOOD'
-            else:
-                color = 'DEFAULT'
-            
-            channel_line = self.add(npyscreen.Textfield, value=display_str, rely=rely, color=color, editable=False)
-            self.channel_lines.append(channel_line)
-            rely += 1  # Increment position for next line
-
-    def on_exit(self):
-        self.stop_thread = True  # Signal the thread to stop
-        for channel in processor.channel_flags.keys():
-            twitch_autodownloader.stop_download(channel)
-        self.monitoring_thread.join()  # Wait for the monitoring thread to finish
-        for thread in self.threads:
-            thread.join()  # Wait for each thread to finish
-        self.parentApp.switchForm(None)
-
 #============== Folder ==============
 class FolderProcessForm(npyscreen.ActionForm):
     def create(self):
@@ -356,11 +412,12 @@ def main():
     try:
         app = App()
         app.run()
-    except KeyboardInterrupt:
-        # Handle manual interruption gracefully
-        print("Gracefully shutting down...")
-        # Additional cleanup code if needed
-        sys.exit(0)
+    finally:
+        for thread in app.threads:
+            try:
+                thread.join()
+            except Exception as e:
+                print(f'Error while waiting for thread to join: {e}')
 
 if __name__ == "__main__":
     main()

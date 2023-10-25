@@ -271,7 +271,7 @@ def main(video_path, position=1, input_directory="vods"):
         
         for writer in video_writers.values():
             writer.release()
-        
+        print(f"\n------------\nProcessed video: {filename}")
         # Organizing the output
         #with print_lock:
             #print(f"\n------------\nProcessed video: {filename}")
@@ -283,7 +283,7 @@ def main(video_path, position=1, input_directory="vods"):
                 #print("\n=------------------\n")
             #else:
                 #print("No objects detected.\n")
-    
+    print("Completed processing")
     if debug:    
         debug_video_output.release()
     cap.release()
