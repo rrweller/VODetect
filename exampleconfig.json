@@ -18,7 +18,7 @@
         "channels": [
             "ENTER CHANNELS HERE",
         ],
-        "CHECK_INTERVAL_SECONDS": 60
+        "CHECK_INTERVAL_SECONDS": 5
     },
     "youtube_downloader": {
         "DESIRED_QUALITY": "720p"
