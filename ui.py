@@ -91,6 +91,8 @@ class TwitchForm(npyscreen.ActionForm):
         self.loaded_vod_count = 0
         self.selected_vod_ids = []  # List to store all selected VOD IDs
         self.loaded_vods = []  # Initialize loaded_vods
+        self.page_number = 1  # Initialize page number to 1
+        self.page_display = self.add(npyscreen.Textfield, value=f"Page: {self.page_number}", editable=False, rely=-4)
 
     def beforeEditing(self):
         if self.channel_name_value:
@@ -104,6 +106,7 @@ class TwitchForm(npyscreen.ActionForm):
             self.load_vods()
             return
         elif "Load 10 More" in [self.vods.values[i] for i in self.vods.value]:
+            self.page_number += 1
             self.get_selected_vods()
             return
         else:
@@ -131,6 +134,8 @@ class TwitchForm(npyscreen.ActionForm):
         self.vods.values = vod_titles
         self.loaded_vod_count += 10
         self.vods.cursor_line = 0
+        self.page_display.value = f"Page: {self.page_number}"
+        self.page_display.display()
         self.vods.display()
         return channel_vods, self.after_cursor  # Return both values
 
@@ -246,9 +251,11 @@ class TwitchAutoDownloaderForm(npyscreen.FormBaseNew):
 class YouTubeForm(npyscreen.ActionForm):
     def create(self):
         self.channel_name_value = None
-        self.videos = self.add(npyscreen.MultiSelect, name="Videos", values=[], scroll_exit=True)
+        self.videos = self.add(npyscreen.MultiSelect, name="Videos", values=[], scroll_exit=True, max_height=-4)
         self.loaded_video_count = 0
         self.selected_video_urls = []  # List to store all selected video URLs
+        self.page_number = 1  # Initialize page number to 1
+        self.page_display = self.add(npyscreen.Textfield, value=f"Page: {self.page_number}", editable=False, rely=-4)
 
     def beforeEditing(self):
         if self.channel_name_value:
@@ -262,6 +269,7 @@ class YouTubeForm(npyscreen.ActionForm):
             self.load_videos()
             return
         elif "Load 20 More" in [self.videos.values[i] for i in self.videos.value]:
+            self.page_number += 1
             self.get_selected_videos()
             return
         else:
@@ -275,6 +283,7 @@ class YouTubeForm(npyscreen.ActionForm):
             if new_channel:
                 self.channel_name_value = new_channel
                 self.loaded_video_count = 0  # Reset the video counter
+                self.page_number = 1  # Reset the page number
             else:
                 self.start_download_and_inference()
 
@@ -289,6 +298,8 @@ class YouTubeForm(npyscreen.ActionForm):
         self.videos.values = video_titles
         self.loaded_video_count += 20
         self.videos.cursor_line = 0
+        self.page_display.value = f"Page: {self.page_number}"
+        self.page_display.display()
         self.videos.display()
 
     def get_selected_videos(self):
@@ -324,6 +335,8 @@ class YouTubeShortsForm(npyscreen.ActionForm):
         self.shorts = self.add(npyscreen.MultiSelect, name="Shorts", values=[], scroll_exit=True)
         self.loaded_short_count = 0
         self.selected_short_urls = []
+        self.page_number = 1  # Initialize page number to 1
+        self.page_display = self.add(npyscreen.Textfield, value=f"Page: {self.page_number}", editable=False, rely=-4)
 
     def beforeEditing(self):
         if self.channel_name_value:
@@ -337,6 +350,7 @@ class YouTubeShortsForm(npyscreen.ActionForm):
             self.load_shorts()
             return
         elif "Load 20 More" in [self.shorts.values[i] for i in self.shorts.value]:
+            self.page_number += 1
             self.get_selected_shorts()
             return
         else:
@@ -361,6 +375,8 @@ class YouTubeShortsForm(npyscreen.ActionForm):
         self.shorts.values = short_titles
         self.loaded_short_count += 20
         self.shorts.cursor_line = 0
+        self.page_display.value = f"Page: {self.page_number}"
+        self.page_display.display()
         self.shorts.display()
 
     def get_selected_shorts(self):
