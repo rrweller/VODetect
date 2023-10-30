@@ -15,6 +15,10 @@
         "END_TIME_MINUTES": 60
     },
 	"twitch_autodownloader": {
+	"DESIRED_QUALITY": "720p",
+        "ENABLE_TRIMMING": true,
+        "START_TIME_MINUTES": 0,
+        "END_TIME_MINUTES": 60,
         "channels": [
             "ENTER CHANNELS HERE",
         ],
