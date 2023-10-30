@@ -41,7 +41,8 @@ def run_inference(video_file, position=0):
         base_name = os.path.basename(video_file)
         channel_name = base_name.split('_')[0]
         set_channel_status(channel_name, "offline")
-        print(f"Set {channel_name} status to offline because inference was complete.")
+        position -= 1
+        #print(f"Set {channel_name} status to offline because inference was complete.")
         semaphore.release()
 
 def inference_worker():
