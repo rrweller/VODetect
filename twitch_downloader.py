@@ -78,6 +78,11 @@ def download_single_vod(channel_name, vod_id):
             success = trim_video(output_path, start_time_seconds, end_time_seconds, trimmed_output_path)
             if success:
                 print(f"Trimmed video saved to {trimmed_output_path}")
+                try:
+                    os.remove(output_path)  # Delete the original VOD file
+                    print(f"Original VOD file {output_path} deleted.")
+                except Exception as e:
+                    print(f"Failed to delete original VOD file: {e}")
                 return trimmed_output_path  # Return the path to the trimmed video
             else:
                 print("Failed to trim video.")
