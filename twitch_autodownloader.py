@@ -16,10 +16,12 @@ channel_inferencing = {}
 if not os.path.exists(OUTPUT_DIR):
     os.makedirs(OUTPUT_DIR)
 
-def get_stream_url(channel_name):
+def get_stream_url(channel_name, desired_quality):
     try:
         streams = streamlink.streams(f'https://www.twitch.tv/{channel_name}')
-        if 'best' in streams:
+        if desired_quality in streams:
+            return streams[desired_quality].url
+        elif 'best' in streams:
             return streams['best'].url
         else:
             return None
@@ -50,14 +52,31 @@ def generate_output_path(channel_name):
     return os.path.join(OUTPUT_DIR, filename)
 
 def download_stream(channel_name):
-    stream_url = get_stream_url(channel_name)
+    # Retrieve configuration options
+    desired_quality = config["twitch_autodownloader"]["DESIRED_QUALITY"]
+    enable_trimming = config["twitch_autodownloader"]["ENABLE_TRIMMING"]
+    start_time = config["twitch_autodownloader"]["START_TIME_MINUTES"] * 60  # Convert minutes to seconds
+    end_time = config["twitch_autodownloader"]["END_TIME_MINUTES"] * 60  # Convert minutes to seconds
+
+    # Get the stream URL of the desired quality
+    stream_url = get_stream_url(channel_name, desired_quality)
     if not stream_url:
         print(f"Failed to get stream URL for {channel_name}.")
-        return
+        return None
 
     output_path = generate_output_path(channel_name)
     print(f"Downloading stream for {channel_name} to {output_path}...")
-    process = subprocess.Popen(["ffmpeg", "-i", stream_url, "-c", "copy", output_path])
+
+    # Construct the FFmpeg command
+    cmd = ["ffmpeg", "-i", stream_url, "-c", "copy"]
+    if enable_trimming:
+        if start_time > 0:
+            cmd.extend(["-ss", str(start_time)])
+        if end_time > start_time:
+            cmd.extend(["-to", str(end_time)])
+    cmd.append(output_path)
+
+    process = subprocess.Popen(cmd)
     live_processes[channel_name] = process
     process.communicate()  # Wait for the process to finish
     return output_path
