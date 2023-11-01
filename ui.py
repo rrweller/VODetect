@@ -26,6 +26,7 @@ class App(npyscreen.NPSAppManaged):
         self.addForm("YOUTUBESHORTS", YouTubeShortsForm, name="YouTube Shorts Menu")  # New form for YouTube Shorts
         self.addForm("CHANNELNAME", ChannelNameForm, name="Channel Selection")
         self.addForm("NEWCHANNEL", NewChannelForm, name="New Channel Selection")
+        self.addForm('NUMBERINPUT', NumberInputForm, name="Bulk Video Downloader (Clears any manually selected videos)")
         self.addForm("TWITCHAUTODOWNLOADER", TwitchAutoDownloaderForm, name="Twitch Auto-Downloader")
 
 class MainMenuForm(npyscreen.ActionForm):
@@ -81,6 +82,37 @@ class NewChannelForm(npyscreen.ActionPopup):
 
     def beforeEditing(self):
         self.channel_name.value = ""
+
+class N_Button(npyscreen.ButtonPress):
+    def __init__(self, *args, **keywords):
+        self.target_form_id = keywords.pop('target_form_id', None)
+        super(N_Button, self).__init__(*args, **keywords)
+
+    def whenPressed(self):
+        if self.target_form_id:
+            app = self.parent.parentApp
+            target_form = app.getForm(self.target_form_id)
+            number_input_form = app.getForm('NUMBERINPUT')
+            number_input_form.set_parent_form(target_form)
+            number_input_form.edit()
+        else:
+            npyscreen.notify_confirm("Target form ID not set.", title="Error", wrap=True)
+
+class NumberInputForm(npyscreen.ActionPopup):
+    def create(self):
+        self.number = self.add(npyscreen.TitleText, name="Enter number of videos to bulk download:", value="")
+        self.parent_form_name = None
+
+    def set_parent_form(self, form):
+        self.parent_form_id = form.FORM_NAME
+
+    def on_ok(self):
+        if self.parent_form_id:
+            parent_form = self.parentApp.getForm(self.parent_form_id)
+            parent_form.download_n_videos(int(self.number.value))
+        else:
+            npyscreen.notify_confirm("Parent form not set.", title="Error", wrap=True)
+        self.parentApp.switchForm(None)
 
 #============== Twitch ==============
 class TwitchForm(npyscreen.ActionForm):
@@ -256,6 +288,7 @@ class YouTubeForm(npyscreen.ActionForm):
         self.selected_video_urls = []  # List to store all selected video URLs
         self.page_number = 1  # Initialize page number to 1
         self.page_display = self.add(npyscreen.Textfield, value=f"Page: {self.page_number}", editable=False, rely=-4)
+        self.button = self.add(N_Button, name="Download Bulk", target_form_id="YOUTUBE")
 
     def beforeEditing(self):
         if self.channel_name_value:
@@ -263,6 +296,49 @@ class YouTubeForm(npyscreen.ActionForm):
                 self.load_videos()  # Assuming load_videos now returns something you handle
             except Exception as e:
                 npyscreen.notify_confirm(str(e), title='Error', wrap=True)
+
+    def load_videos(self):
+        # Load the next set of videos
+        channel_videos = youtube_downloader.get_latest_videos(self.channel_name_value, start=self.loaded_video_count, count=20) # Updated line
+        video_titles = [video[0] for video in channel_videos] + ["Load 20 More"]
+        
+        # Clear previous selections
+        self.videos.value = []
+        
+        self.videos.values = video_titles
+        self.loaded_video_count += 20
+        self.videos.cursor_line = 0
+        self.page_display.value = f"Page: {self.page_number}"
+        self.page_display.display()
+        self.videos.display()
+
+    def get_selected_videos(self):
+        selected_videos = [self.videos.values[i] for i in self.videos.value if i != len(self.videos.values) - 1]
+        all_videos = youtube_downloader.get_latest_videos(self.channel_name_value, start=self.loaded_video_count - 20, count=20)
+        self.selected_video_urls.extend([url for title, url in all_videos if title in selected_videos])
+    
+    def download_n_videos(self, n):
+        self.selected_video_urls = []  # Clear previously selected videos
+        all_videos = youtube_downloader.get_latest_videos(self.channel_name_value, start=0, count=n)
+        self.selected_video_urls.extend([url for _, url in all_videos])
+        self.start_download_and_inference()
+
+    def start_download_and_inference(self):
+        # Start the inference worker thread
+        threading.Thread(target=processor.inference_worker).start()
+
+        def download_and_infer():
+            for url in self.selected_video_urls:
+                with print_lock:
+                    video_file = youtube_downloader.download_video(url)
+                # Add the downloaded video to the queue for inference
+                processor.waiting_for_inference.put(video_file)
+            # Put sentinel values for each inference worker thread to signal them to exit
+            for _ in range(processor.MAX_INFERENCE_THREADS):
+                processor.waiting_for_inference.put(None)
+
+        threading.Thread(target=download_and_infer).start()
+        self.parentApp.switchForm(None)
 
     def on_ok(self):
         if not self.videos.values:
@@ -287,43 +363,6 @@ class YouTubeForm(npyscreen.ActionForm):
             else:
                 self.start_download_and_inference()
 
-    def load_videos(self):
-        # Load the next set of videos
-        channel_videos = youtube_downloader.get_latest_videos(self.channel_name_value, start=self.loaded_video_count, count=20) # Updated line
-        video_titles = [video[0] for video in channel_videos] + ["Load 20 More"]
-        
-        # Clear previous selections
-        self.videos.value = []
-        
-        self.videos.values = video_titles
-        self.loaded_video_count += 20
-        self.videos.cursor_line = 0
-        self.page_display.value = f"Page: {self.page_number}"
-        self.page_display.display()
-        self.videos.display()
-
-    def get_selected_videos(self):
-        selected_videos = [self.videos.values[i] for i in self.videos.value if i != len(self.videos.values) - 1]
-        all_videos = youtube_downloader.get_latest_videos(self.channel_name_value, start=self.loaded_video_count - 20, count=20)
-        self.selected_video_urls.extend([url for title, url in all_videos if title in selected_videos])
-
-    def start_download_and_inference(self):
-        # Start the inference worker thread
-        threading.Thread(target=processor.inference_worker).start()
-
-        def download_and_infer():
-            for url in self.selected_video_urls:
-                with print_lock:
-                    video_file = youtube_downloader.download_video(url)
-                # Add the downloaded video to the queue for inference
-                processor.waiting_for_inference.put(video_file)
-            # Put sentinel values for each inference worker thread to signal them to exit
-            for _ in range(processor.MAX_INFERENCE_THREADS):
-                processor.waiting_for_inference.put(None)
-
-        threading.Thread(target=download_and_infer).start()
-        self.parentApp.switchForm(None)
-
     def on_cancel(self):
         self.parentApp.switchForm('MAIN')
 
@@ -332,11 +371,12 @@ class YouTubeShortsForm(npyscreen.ActionForm):
     # This form is tailored for shorts.
     def create(self):
         self.channel_name_value = None
-        self.shorts = self.add(npyscreen.MultiSelect, name="Shorts", values=[], scroll_exit=True)
+        self.shorts = self.add(npyscreen.MultiSelect, name="Shorts", values=[], scroll_exit=True, max_height=-4)
         self.loaded_short_count = 0
         self.selected_short_urls = []
         self.page_number = 1  # Initialize page number to 1
         self.page_display = self.add(npyscreen.Textfield, value=f"Page: {self.page_number}", editable=False, rely=-4)
+        self.button = self.add(N_Button, name="Download Bulk", target_form_id="YOUTUBESHORTS")
 
     def beforeEditing(self):
         if self.channel_name_value:
@@ -378,11 +418,18 @@ class YouTubeShortsForm(npyscreen.ActionForm):
         self.page_display.value = f"Page: {self.page_number}"
         self.page_display.display()
         self.shorts.display()
+        self.display()
 
     def get_selected_shorts(self):
         selected_shorts = [self.shorts.values[i] for i in self.shorts.value if i != len(self.shorts.values) - 1]
         all_shorts = youtube_downloader_shorts.get_latest_shorts(self.channel_name_value, start=self.loaded_short_count - 20, count=20)
         self.selected_short_urls.extend([url for title, url in all_shorts if title in selected_shorts])
+    
+    def download_n_videos(self, n):
+        self.selected_short_urls = []  # Clear previously selected videos
+        all_shorts = youtube_downloader_shorts.get_latest_shorts(self.channel_name_value, start=0, count=n)
+        self.selected_short_urls.extend([url for _, url in all_shorts])
+        self.start_download_and_inference()
 
     def start_download_and_inference(self):
         threading.Thread(target=processor.inference_worker).start()
