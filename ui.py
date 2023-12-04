@@ -257,6 +257,7 @@ class TwitchAutoDownloaderForm(npyscreen.FormBaseNew):
     def on_stop_downloads(self):
         self.stop_thread = True
         processor.STOP_MONITORING = True
+        self.parentApp.switchForm(None)
         for channel in processor.channel_flags.keys():
             try:
                 twitch_autodownloader.stop_download(channel)

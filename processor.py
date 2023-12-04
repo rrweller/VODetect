@@ -153,6 +153,8 @@ def process_folder(folder_path, common_size=TARGET_SIZE):
     tmp_folder = os.path.join(folder_path, 'tmp')
     if not os.path.exists(tmp_folder):
         os.makedirs(tmp_folder)
+    else:
+        print("Error making tmp folder!")
 
     # Enqueue all video files in the folder
     video_files = [os.path.join(folder_path, file) for file in os.listdir(folder_path) if file.lower().endswith(('.mp4', '.mkv', '.avi', '.mov', '.flv', '.wmv'))]
