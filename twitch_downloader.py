@@ -3,6 +3,7 @@ import subprocess
 import requests
 import threading
 import json
+import re
 
 # Load configuration from config.json
 with open('config.json', 'r') as config_file:
@@ -19,8 +20,9 @@ HEADERS = {
 
 print_lock = threading.Lock()
 
-def download_single_vod(channel_name, vod_id):
-    print(f"Attempting to download VOD ID: {vod_id}")  # Debug line
+def download_single_vod(channel_name, vod_id, title):
+    sanitized_title = sanitize_title(title)
+    print(f"Attempting to download VOD: {sanitized_title}")  # Debug line
     # Ensure the 'vods' directory exists
     if not os.path.exists("vods"):
         os.makedirs("vods")
@@ -37,10 +39,12 @@ def download_single_vod(channel_name, vod_id):
     quality = quality_codes.get(desired_quality, "best")
 
     root_directory = os.getcwd()  # This gets the current working directory of the script
-    output_path = os.path.join(root_directory, "vods", f"{vod_id}.mp4")
+    output_path = os.path.join(root_directory, "vods", f"{sanitized_title}.mp4")
+
+    quoted_output_path = f"\"{output_path}\""
     
     # Construct the command to use yt-dlp
-    cmd = f"yt-dlp https://www.twitch.tv/videos/{vod_id} -f {quality} -o {output_path}"
+    cmd = f"yt-dlp https://www.twitch.tv/videos/{vod_id} -f {quality} -o {quoted_output_path}"
     
     # Print the command for debugging
     print(f"Executing command: {cmd}")
@@ -59,7 +63,8 @@ def download_single_vod(channel_name, vod_id):
     # Check for errors in the result
     stderr_output = process.stderr.read()
     if "ERROR" in stderr_output or "Unhandled exception" in stderr_output:
-        print(f"\nError downloading VOD {vod_id}: VOD not found or inaccessible.")
+        print(stderr_output)
+        print(f"Error downloading VOD {sanitized_title} with id {vod_id}: VOD not found or inaccessible.\n")
         return None
 
     print("\nDownload completed.")
@@ -98,6 +103,7 @@ def get_user_id(channel_name):
     if 'data' in data and len(data['data']) > 0:
         return data['data'][0]['id']
     else:
+        print(response)
         print("Error fetching user ID. Check the response above for details.")
         return None
 
@@ -138,13 +144,19 @@ def trim_video(input_path, start_time, end_time, output_path):
         print(f"Error trimming video: {process.stderr.decode('utf-8')}")
         return False
 
-if __name__ == "__main__":
-    try:
-        channel_name = input("Enter the Twitch channel name: ")
-        video_path = download_single_vod(channel_name)
-        if video_path:
-            print(f"Downloaded VOD to {video_path}")
-        else:
-            print("Failed to download VOD.")
-    except KeyboardInterrupt:
-        print("\nInterrupted by user. Exiting...")
+def sanitize_title(title, max_length=40):
+    # Replace spaces with underscores and remove other non-alphanumeric characters
+    sanitized = re.sub(r'\s+', '_', title)  # Replace spaces with underscores
+    sanitized = re.sub(r'[^\w\-_\.]', '', sanitized)  # Remove non-alphanumeric, excluding - and .
+    return sanitized[:max_length]  # Truncate to max_length
+
+#if __name__ == "__main__":
+    #try:
+        #channel_name = input("Enter the Twitch channel name: ")
+        #video_path = download_single_vod(channel_name)
+        #if video_path:
+            #print(f"Downloaded VOD to {video_path}")
+        #else:
+            #print("Failed to download VOD.")
+    #except KeyboardInterrupt:
+        #print("\nInterrupted by user. Exiting...")

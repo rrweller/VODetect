@@ -160,6 +160,8 @@ class TwitchForm(npyscreen.ActionForm):
         channel_vods, self.after_cursor = twitch_downloader.get_latest_vods(self.channel_name_value, num_vods=10, after_cursor=self.after_cursor)
         vod_titles = [vod[0] for vod in channel_vods] + ["Load 10 More"]
         
+        # Create a mapping of VOD titles to IDs
+        self.vod_title_id_mapping = {vod[0]: vod[1] for vod in channel_vods}
         # Clear previous selections
         self.vods.value = []
         
@@ -173,7 +175,7 @@ class TwitchForm(npyscreen.ActionForm):
 
     def get_selected_vods(self):
         selected_vods = [self.vods.values[i] for i in self.vods.value if i != len(self.vods.values) - 1]
-        self.selected_vod_ids.extend([vod_id for title, vod_id in self.loaded_vods if title in selected_vods])
+        self.selected_vod_ids.extend([(title, self.vod_title_id_mapping[title]) for title in selected_vods])
 
     def start_download_and_inference(self):
         # Start the inference worker thread
@@ -181,9 +183,9 @@ class TwitchForm(npyscreen.ActionForm):
 
         def download_and_infer():
             print(f"VOD IDs to download: {self.selected_vod_ids}")  # Debug line
-            for vod_id in self.selected_vod_ids:
+            for title, vod_id in self.selected_vod_ids:
                 with print_lock:
-                    vod_file = twitch_downloader.download_single_vod(self.channel_name_value, vod_id)
+                    vod_file = twitch_downloader.download_single_vod(self.channel_name_value, vod_id, title)  # Pass title here
                 # Add the downloaded vod to the queue for inference
                 processor.waiting_for_inference.put(vod_file)
             # Put sentinel values for each inference worker thread to signal them to exit
