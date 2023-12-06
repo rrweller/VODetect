@@ -79,19 +79,19 @@ def download_single_vod(channel_name, vod_id, title):
         if end_time_seconds <= start_time_seconds:
             print("Error: END_TIME_MINUTES is not greater than START_TIME_MINUTES. Skipping trimming.")
         else:
-            trimmed_output_path = os.path.join(root_directory, "vods", f"trimmed_{vod_id}.mp4")
-            success = trim_video(output_path, start_time_seconds, end_time_seconds, trimmed_output_path)
+            trimmed_output_path = os.path.join(root_directory, "vods", f"trimmed_{sanitized_title}.mp4")
+            success = trim_video(quoted_output_path, start_time_seconds, end_time_seconds, trimmed_output_path)
             if success:
                 print(f"Trimmed video saved to {trimmed_output_path}")
                 try:
-                    os.remove(output_path)  # Delete the original VOD file
-                    print(f"Original VOD file {output_path} deleted.")
+                    os.remove(quoted_output_path)  # Delete the original VOD file
+                    print(f"Original VOD file {quoted_output_path} deleted.")
                 except Exception as e:
                     print(f"Failed to delete original VOD file: {e}")
                 return trimmed_output_path  # Return the path to the trimmed video
             else:
                 print("Failed to trim video.")
-
+    print(output_path)
     return output_path
 
 def get_user_id(channel_name):
