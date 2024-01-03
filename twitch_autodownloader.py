@@ -5,6 +5,7 @@ import os
 import time
 import streamlink
 import sys
+import logging
 
 with open('config.json', 'r') as config_file:
     config = json.load(config_file)
@@ -15,6 +16,14 @@ channel_inferencing = {}
 
 if not os.path.exists(OUTPUT_DIR):
     os.makedirs(OUTPUT_DIR)
+
+# Configure logging
+logging.basicConfig(level=logging.INFO,
+                    format='%(asctime)s - %(levelname)s - %(message)s',
+                    handlers=[
+                        logging.FileHandler("download_log.log"),  # Log to this file
+                        logging.StreamHandler()  # And also to console
+                    ])
 
 def get_stream_url(channel_name, desired_quality):
     try:
@@ -27,6 +36,7 @@ def get_stream_url(channel_name, desired_quality):
             return None
     except Exception as e:
         print(f"Error fetching stream URL for channel {channel_name}: {e}")
+        logging.error(f"Error fetching stream URL for channel {channel_name}: {e}")
         return None
 
 def check_channel_status(channel_name, channel_status):
@@ -39,12 +49,15 @@ def check_channel_status(channel_name, channel_status):
                 return "offline"
         except Exception as e:
             print(f"Error checking status for channel {channel_name}: {e}")
+            logging.error(f"Error checking status for channel {channel_name}: {e}")
             return "error"
     elif channel_status == "inference":
         print(f"Channel {channel_name} is in 'inferencing' state.")
+        logging.info(f"Channel {channel_name} is in 'inferencing' state.")
         return "inference"  # or you can return "unknown" or "error" based on your use case
     else:
         print(f"Unknown status for channel {channel_name}")
+        logging.error(f"Unknown status for channel {channel_name}")
         return "unknown"
 
 def generate_output_path(channel_name):
@@ -62,13 +75,14 @@ def download_stream(channel_name):
     stream_url = get_stream_url(channel_name, desired_quality)
     if not stream_url:
         print(f"Failed to get stream URL for {channel_name}.")
+        logging.error(f"Failed to get stream URL for {channel_name}.")
         return None
 
     output_path = generate_output_path(channel_name)
     print(f"Downloading stream for {channel_name} to {output_path}...")
 
     # Construct the FFmpeg command
-    cmd = ["ffmpeg", "-i", stream_url, "-c", "copy"]
+    cmd = ["ffmpeg", "-i", stream_url, "-c", "copy", "-bsf:a", "aac_adtstoasc"]
     if enable_trimming:
         if start_time > 0:
             cmd.extend(["-ss", str(start_time)])
@@ -78,13 +92,22 @@ def download_stream(channel_name):
 
     process = subprocess.Popen(cmd)
     live_processes[channel_name] = process
+
+    # Generate log file paths
+    stdout_log_file = os.path.join(OUTPUT_DIR, f"{channel_name}_stdout.log")
+    stderr_log_file = os.path.join(OUTPUT_DIR, f"{channel_name}_stderr.log")
+
+    with open(stdout_log_file, "w") as stdout_file, open(stderr_log_file, "w") as stderr_file:
+        process = subprocess.Popen(cmd, stdout=stdout_file, stderr=stderr_file)
+        live_processes[channel_name] = process
+        
     process.communicate()  # Wait for the process to finish
     return output_path
 
 def stop_download(channel_name):
     if channel_name in live_processes:
         print(f"Stopping download for {channel_name}. Process ID: {live_processes[channel_name].pid}")
-
+        logging.info(f"Stopping download for {channel_name}. Process ID: {live_processes[channel_name].pid}")
         # Check if the process is still running
         if live_processes[channel_name].poll() is None:
             try:
